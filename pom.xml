@@ -216,9 +216,9 @@
 								<licenseName>${license.licenseName}</licenseName>
 								<roots>
 									<root>src/main/java/io</root>
-									<root>src/main/java/io</root>
-									<root>src/test/java/OSM5NBIClient</root>
-									<root>src/test/java/OSM5Util</root>
+									<root>src/main/java/OSM5NBIClient</root>
+									<root>src/main/java/OSM5Util</root>
+									<root>src/test/java</root>
 								</roots>
 							</configuration>
 						</execution>
