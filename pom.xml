@@ -8,7 +8,22 @@
   <packaging>jar</packaging>
 
   <name>io.openslice.sol005nbi.osm5</name>
-  <url>http://maven.apache.org</url>
+  
+	<organization>
+		<name>openslice.io</name>
+		<url>http://openslice.io</url>
+	</organization>
+	
+	<inceptionYear>2019</inceptionYear>
+	
+	<licenses>
+        <license>
+            <name>Apache 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
 
 <pluginRepositories>
 		<pluginRepository>
@@ -48,7 +63,9 @@
         <salGeneratorPath>${project.build.directory}/generated-sources/mdsal-binding</salGeneratorPath>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	    <maven.compiler.source>1.8</maven.compiler.source>
-	    <maven.compiler.target>1.8</maven.compiler.target>
+	    <maven.compiler.target>1.8</maven.compiler.target>	    
+		<maven-license-plugin.version>2.0.0</maven-license-plugin.version>
+		<license.licenseName>apache_v2</license.licenseName>
     </properties>
 	<dependencyManagement>
 		<dependencies>
@@ -179,7 +196,42 @@
 						<target>1.8</target>
 					</configuration>
 				</plugin>
-				</plugins>
+				<plugin>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>license-maven-plugin</artifactId>
+					<version>${maven-license-plugin.version}</version>
+					<configuration>
+						<addJavaLicenseAfterPackage>false</addJavaLicenseAfterPackage>
+						<processStartTag>========================LICENSE_START=================================</processStartTag>
+						<processEndTag>=========================LICENSE_END==================================</processEndTag>
+					</configuration>
+					<executions>
+						<execution>
+							<id>generate-license-headers</id>
+							<goals>
+								<goal>update-file-header</goal>
+							</goals>
+							<phase>process-sources</phase>
+							<configuration>
+								<licenseName>${license.licenseName}</licenseName>
+								<roots>
+									<root>src/main/java/io</root>
+									<root>src/main/java/io</root>
+									<root>src/test/java/OSM5NBIClient</root>
+									<root>src/test/java/OSM5Util</root>
+								</roots>
+							</configuration>
+						</execution>
+						<execution>
+							<id>download-licenses</id>
+							<goals>
+								<goal>download-licenses</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+				
+			</plugins>
 		</pluginManagement>            
     </build>
     
