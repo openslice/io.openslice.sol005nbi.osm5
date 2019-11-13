@@ -204,6 +204,7 @@
 						<addJavaLicenseAfterPackage>false</addJavaLicenseAfterPackage>
 						<processStartTag>========================LICENSE_START=================================</processStartTag>
 						<processEndTag>=========================LICENSE_END==================================</processEndTag>
+						<roots>src/main/java/io,src/main/java/OSM5NBIClient,src/main/java/OSM5Util</roots>
 					</configuration>
 					<executions>
 						<execution>
@@ -214,12 +215,7 @@
 							<phase>process-sources</phase>
 							<configuration>
 								<licenseName>${license.licenseName}</licenseName>
-								<roots>
-									<root>src/main/java/io</root>
-									<root>src/main/java/OSM5NBIClient</root>
-									<root>src/main/java/OSM5Util</root>
-									<root>src/test/java</root>
-								</roots>
+							
 							</configuration>
 						</execution>
 						<execution>
