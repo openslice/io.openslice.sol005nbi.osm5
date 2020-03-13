@@ -67,10 +67,11 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import io.openslice.sol005nbi.OSMClient;
 import osm5.ns.riftware._1._0.project.nsd.rev170228.project.nsd.catalog.Nsd;
 import osm5.ns.riftware._1._0.project.vnfd.rev170228.project.vnfd.catalog.Vnfd;
 
-public class OSM5Client {
+public class OSM5Client implements OSMClient {
 
 	private static final Logger logger = LogManager.getLogger(OSM5Client.class);
 			
@@ -212,6 +213,7 @@ public class OSM5Client {
 		ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 		
 		try {
+			System.out.println(response.getBody());
 			Vnfd[] vnfd_array = mapper.readValue(new YAMLFactory().createParser(response.getBody()), Vnfd[].class);
 			return vnfd_array;
 		} catch (IllegalStateException | IOException e) {

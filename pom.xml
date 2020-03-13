@@ -1,13 +1,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-
-  <groupId>io.openslice</groupId>
-  <artifactId>io.openslice.sol005nbi.osm5</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
-
-  <name>io.openslice.sol005nbi.osm5</name>
+	<modelVersion>4.0.0</modelVersion>
+	
+	<groupId>io.openslice.sol005nbi</groupId>
+	<artifactId>io.openslice.sol005nbi.osm5</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
+	
+	<name>io.openslice.sol005nbi.osm5</name>
   
 	<organization>
 		<name>openslice.io</name>
@@ -25,7 +25,7 @@
         </license>
     </licenses>
 
-<pluginRepositories>
+	<pluginRepositories>
 		<pluginRepository>
 			<id>opendaylight-release</id>
 			<name>opendaylight-release</name>
@@ -62,8 +62,8 @@
 	    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <salGeneratorPath>${project.build.directory}/generated-sources/mdsal-binding</salGeneratorPath>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	    <maven.compiler.source>1.8</maven.compiler.source>
-	    <maven.compiler.target>1.8</maven.compiler.target>	    
+	    <maven.compiler.source>1.11</maven.compiler.source>
+	    <maven.compiler.target>1.11</maven.compiler.target>	    
 		<maven-license-plugin.version>2.0.0</maven-license-plugin.version>
 		<license.licenseName>apache_v2</license.licenseName>
     </properties>
@@ -97,6 +97,11 @@
         		
 
 		<!-- Dependencies for OSMClient START -->
+        <dependency>
+            <groupId>io.openslice.sol005nbi</groupId>
+            <artifactId>io.openslice.sol005nbi.osm</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>		
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
