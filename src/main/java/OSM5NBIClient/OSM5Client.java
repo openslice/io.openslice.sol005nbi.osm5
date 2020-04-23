@@ -613,6 +613,32 @@ public class OSM5Client implements OSMClient {
 			return null;
 	}	
 
+	public JSONObject getNSInstanceContentInfo(String ns_instance_id)
+	{
+		ResponseEntity<String> ns_instance_id_info_response = this.getOSMResponse("/osm/nslcm/v1/ns_instances_content/"+ns_instance_id);
+		logger.info("Status of Request: "+ns_instance_id_info_response.getStatusCode());
+		if(!ns_instance_id_info_response.getStatusCode().is4xxClientError() && !ns_instance_id_info_response.getStatusCode().is5xxServerError() )
+		{
+			JSONObject ns_instance_info_obj = new JSONObject(ns_instance_id_info_response.getBody());
+			return ns_instance_info_obj;		
+		}
+		else
+			return null;
+	}
+	
+	public JSONObject getNSLCMDetails(String nsLcmOpOccId)
+	{
+		ResponseEntity<String> ns_instance_id_info_response = this.getOSMResponse("/osm/nslcm/v1/ns_lcm_op_occs/"+nsLcmOpOccId);
+		logger.info("Status of Request: "+ns_instance_id_info_response.getStatusCode());
+		if(!ns_instance_id_info_response.getStatusCode().is4xxClientError() && !ns_instance_id_info_response.getStatusCode().is5xxServerError() )
+		{
+			JSONObject ns_instance_info_obj = new JSONObject(ns_instance_id_info_response.getBody());
+			return ns_instance_info_obj;		
+		}
+		else
+			return null;
+	}	
+	
 	public JSONObject getVNFInstanceInfo(String vnf_instance_id)
 	{
 		ResponseEntity<String> vnf_instance_id_info_response = this.getOSMResponse("/osm/nslcm/v1/vnf_instances/"+vnf_instance_id);		
