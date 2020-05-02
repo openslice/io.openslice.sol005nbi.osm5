@@ -213,7 +213,6 @@ public class OSM5Client implements OSMClient {
 		ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 		
 		try {
-			System.out.println(response.getBody());
 			Vnfd[] vnfd_array = mapper.readValue(new YAMLFactory().createParser(response.getBody()), Vnfd[].class);
 			return vnfd_array;
 		} catch (IllegalStateException | IOException e) {
@@ -288,60 +287,94 @@ public class OSM5Client implements OSMClient {
 	                .body(e.getResponseBodyAsString());
 		}		
 	}
+
+	private byte[] getByteArrayFromPackagePath(String package_path) throws Exception
+	{
+		byte[] allBytes;
+	    logger.info("Package path = " + package_path);						
+		if(package_path.contains("http")||package_path.contains("localhost"))
+		{
+		    logger.info("Taking the http/localhost logic path");						
+			URL url = new URL(package_path);
+			URLConnection conn = url.openConnection();	
+			logger.info("Trying to open connection to URL");						
+		    logger.info("URL Connection "+conn.toString());						
+			int contentLength = conn.getContentLength();			
+		    logger.info("Content-Length:"+contentLength);						
+			InputStream inputStream = url.openStream();			
+
+			ByteArrayOutputStream tmpOut;
+		    if (contentLength != -1) {
+		        tmpOut = new ByteArrayOutputStream(contentLength);
+		    } else {
+		        tmpOut = new ByteArrayOutputStream(16384); // Pick some appropriate size
+		    }
+
+		    byte[] buf = new byte[512];
+		    while (true) {
+		        int len = inputStream.read(buf);
+		        if (len == -1) {
+		            break;
+		        }
+		        tmpOut.write(buf, 0, len);
+		    }
+		    tmpOut.close(); // No effect, but good to do anyway to keep the metaphor alive
+		    allBytes = tmpOut.toByteArray();			
+		    logger.info("Package allBytes size = "+allBytes.length);						
+			logger.info("Package Filesize: " + contentLength + " bytes.");
+			inputStream.close();
+		}
+		else
+		{
+		    logger.info("Taking the local file path");						
+			InputStream inputStream = new FileInputStream(package_path);
+			long fileSize = new File(package_path).length();
+			allBytes = new byte[(int) fileSize];
+			inputStream.read(allBytes);
+			logger.info("Package Filesize: " + fileSize + " bytes.");
+			inputStream.close();
+		}
+		return allBytes;
+	}
 	
 	public ResponseEntity<String> uploadVNFDPackageContent(String vnfd_id, String package_path) throws IOException{
-		RestTemplate restTemplate = new RestTemplate(requestFactory);
-		HttpHeaders headers = new HttpHeaders();
-		headers.add("content-type", "application/zip");
-		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
+
 		byte[] allBytes;
 		try
-		{		
-			if(package_path.contains("http")||package_path.contains("localhost"))
-			{
-				URL url = new URL(package_path);
-				URLConnection conn = url.openConnection();	
-				int contentLength = conn.getContentLength();			
-				InputStream inputStream = url.openStream();			
-	
-				ByteArrayOutputStream tmpOut;
-			    if (contentLength != -1) {
-			        tmpOut = new ByteArrayOutputStream(contentLength);
-			    } else {
-			        tmpOut = new ByteArrayOutputStream(16384); // Pick some appropriate size
-			    }
-	
-			    byte[] buf = new byte[512];
-			    while (true) {
-			        int len = inputStream.read(buf);
-			        if (len == -1) {
-			            break;
-			        }
-			        tmpOut.write(buf, 0, len);
-			    }
-			    tmpOut.close(); // No effect, but good to do anyway to keep the metaphor alive
-			    allBytes = tmpOut.toByteArray();			
-				System.out.println("allBytes size = "+allBytes.length);		
-				
-				System.out.println("Filesize: " + contentLength + " bytes.");
-				inputStream.close();
-			}
-			else
-			{
-				InputStream inputStream = new FileInputStream(package_path);
-				long fileSize = new File(package_path).length();
-				allBytes = new byte[(int) fileSize];
-				inputStream.read(allBytes);
-				System.out.println("Filesize: " + fileSize + " bytes.");
-				inputStream.close();
-			}
+		{	
+			allBytes = this.getByteArrayFromPackagePath(package_path);
 		}
 		catch(Exception e)
 		{
-			logger.error(e.getMessage().toString());
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error during file loading! "+e.getMessage().toString());			
+			logger.error("Error during VNFD Package file uploading! "+e.getStackTrace().toString());
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error during VNFD Package file uploading! "+e.getMessage().toString());			
 		}
 		
+		return this.uploadVNFDPackageContent(vnfd_id, allBytes);
+	}
+	
+	@Override
+	public ResponseEntity<String> uploadNSDPackageContent(String nsd_id, String package_path) throws IOException{
+		byte[] allBytes;
+		try
+		{
+			allBytes = this.getByteArrayFromPackagePath(package_path);
+		}
+		catch(Exception e)
+		{
+			logger.error("Error during NSD Package file uploading! "+e.getStackTrace().toString());
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error during NSD Package file uploading! "+e.getMessage().toString());			
+		}
+		return this.uploadNSDPackageContent(nsd_id, allBytes);
+	}
+
+	
+	public ResponseEntity<String> uploadVNFDPackageContent(String vnfd_id, byte[] allBytes) throws IOException{
+		
+		RestTemplate restTemplate = new RestTemplate(requestFactory);		
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("content-type", "application/zip");
+		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());		
 		HttpEntity<byte[]> send_zip_request = new HttpEntity<>(allBytes, headers);
 		try
 		{
@@ -349,65 +382,18 @@ public class OSM5Client implements OSMClient {
 					+ "/osm/vnfpkgm/v1/vnf_packages/" + vnfd_id + "/package_content", HttpMethod.PUT,
 					send_zip_request, String.class);
 		}
-	    catch(HttpStatusCodeException e) 
+		catch(HttpStatusCodeException e) 
 		{
-	        return ResponseEntity.status(e.getRawStatusCode()).headers(e.getResponseHeaders())
-	                .body(e.getResponseBodyAsString());
+			return ResponseEntity.status(e.getRawStatusCode()).headers(e.getResponseHeaders())
+			        .body(e.getResponseBodyAsString());
 		}				
 	}
-
-	public ResponseEntity<String> uploadNSDPackageContent(String nsd_id, String package_path) throws IOException{
+		
+	public ResponseEntity<String> uploadNSDPackageContent(String nsd_id, byte[] allBytes) throws IOException{
 		RestTemplate restTemplate = new RestTemplate(requestFactory);
 		HttpHeaders headers = new HttpHeaders();
 		headers.add("content-type", "application/zip");
 		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
-		byte[] allBytes;
-		try
-		{
-			if(package_path.contains("http")||package_path.contains("localhost"))
-			{
-				System.out.println("This is the package path:"+package_path);
-				URL url = new URL(package_path);
-				URLConnection conn = url.openConnection();	
-				int contentLength = conn.getContentLength();			
-				InputStream inputStream = url.openStream();			
-				
-				ByteArrayOutputStream tmpOut;
-			    if (contentLength != -1) {
-			        tmpOut = new ByteArrayOutputStream(contentLength);
-			    } else {
-			        tmpOut = new ByteArrayOutputStream(16384); // Pick some appropriate size
-			    }
-	
-			    byte[] buf = new byte[512];
-			    while (true) {
-			        int len = inputStream.read(buf);
-			        if (len == -1) {
-			            break;
-			        }
-			        tmpOut.write(buf, 0, len);
-			    }
-			    tmpOut.close(); // No effect, but good to do anyway to keep the metaphor alive
-			    allBytes = tmpOut.toByteArray();			
-				System.out.println("allBytes size = "+allBytes.length);		
-				System.out.println("Filesize: " + contentLength + " bytes.");
-				inputStream.close();
-			}
-			else
-			{
-				InputStream inputStream = new FileInputStream(package_path);
-				long fileSize = new File(package_path).length();
-				allBytes = new byte[(int) fileSize];
-				inputStream.read(allBytes);
-				System.out.println("Filesize: " + fileSize + " bytes.");
-				inputStream.close();
-			}
-		}
-		catch(Exception e)
-		{
-			logger.error(e.getMessage().toString());
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error during file loading! "+e.getMessage().toString());			
-		}
 		HttpEntity<byte[]> send_zip_request = new HttpEntity<>(allBytes, headers);
 		try
 		{
@@ -419,61 +405,9 @@ public class OSM5Client implements OSMClient {
 		{
 	        return ResponseEntity.status(e.getRawStatusCode()).headers(e.getResponseHeaders())
 	                .body(e.getResponseBodyAsString());
-		}				
+		}						
 	}
-			
-//	public void uploadNSDZip(String nsd_id, String zip`_path) {
-//		RestTemplate restTemplate = new RestTemplate(requestFactory);
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.add("content-type", "application/zip");
-//		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
-//		//File file = new File(zip_path);
-//		try (InputStream inputStream = new FileInputStream(zip_path);) {
-//			long fileSize = new File(zip_path).length();
-//
-//			byte[] allBytes = new byte[(int) fileSize];
-//
-//			inputStream.read(allBytes);
-//			System.out.println("Filesize: "+fileSize +" bytes");
-//			HttpEntity<byte[]> send_zip_request = new HttpEntity<>(allBytes, headers);
-//			ResponseEntity<String> send_zip_entity = null;
-//			try {
-//				send_zip_entity = restTemplate.exchange(this.getMANOApiEndpoint()
-//						+ "/osm/nsd/v1/ns_descriptors/" + nsd_id + "/nsd_content", HttpMethod.PUT,
-//						send_zip_request, String.class);
-//			} catch (RuntimeException e) {
-//				if(send_zip_entity!=null)
-//				{
-//					if (send_zip_entity.getStatusCode().series() == HttpStatus.Series.SERVER_ERROR) {
-//						// handle SERVER_ERROR
-//						System.out.println("Server ERROR:" + send_zip_entity.getStatusCode().toString());
-//					} else if (send_zip_entity.getStatusCode().series() == HttpStatus.Series.CLIENT_ERROR) {
-//						// handle CLIENT_ERROR
-//						System.out.println("Client ERROR:" + send_zip_entity.getStatusCode().toString());
-//						if (send_zip_entity.getStatusCode() == HttpStatus.NOT_FOUND) {
-//							System.out.println("Unknown Response Status");
-//						}
-//					}
-//					System.out.println("Error! " + send_zip_entity.getBody());
-//				}
-//				else
-//				{
-//					System.out.println("Error! Null Response.");
-//				}
-//				return;
-//			}
-//
-//			if (send_zip_entity.getStatusCode() == HttpStatus.NO_CONTENT) {
-//				System.out.println("No Content Replied!");
-//			}
-//			if (send_zip_entity.getStatusCode() == HttpStatus.CREATED) {
-//				System.out.println("VFND Onboarding Succeded!");
-//			}
-//		} catch (IOException ex) {
-//			ex.printStackTrace();
-//		}
-//	}
-
+	
 	// Creates an NS Instance based on vim_id and nsd_id.
 	public String createNSInstance(String ns_name,String vim_id,String nsd_id)
 	{
@@ -645,6 +579,13 @@ public class OSM5Client implements OSMClient {
 		JSONObject vnf_instance_info_obj = new JSONObject(vnf_instance_id_info_response.getBody());
 		return vnf_instance_info_obj;		
 	}	
+
+	public String getPDUDetails()
+	{
+		ResponseEntity<String> pdu_details_response = this.getOSMResponse("/pdu/v1/pdu_descriptors/");		
+		//JSONObject pdu_details_response_obj = new JSONObject(pdu_details_response.getBody());
+		return pdu_details_response.toString();		
+	}	
 	
 	public ResponseEntity<String> getVNFInstanceInfoNew(String vnf_instance_id)
 	{
@@ -662,68 +603,7 @@ public class OSM5Client implements OSMClient {
 	                .body(e.getResponseBodyAsString());
 		}					
 	}	
-	
-//	public String instantiateNSInstance(String ns_instance_id, String ns_name, String vim_id, String nsd_id) {
-//		RestTemplate restTemplate = new RestTemplate(requestFactory);
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.add("content-type", "application/json");
-//		headers.add("accept", "application/json");
-//		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
-//		HttpEntity<String> request = new HttpEntity<String>(headers);
-//		System.out.println("/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate");
-//
-//		String body="{\"nsName\":\""+ns_name+"\",\"vimAccountId\":\""+vim_id+"\",\"nsdId\":\""+nsd_id+"\"}";
-//		HttpEntity<String> create_ns_instance_request = new HttpEntity<>(body, headers);
-//		System.out.println(create_ns_instance_request);
-//		
-////		ResponseEntity<String> entity = restTemplate.exchange(
-////				this.getMANOApiEndpoint() + "/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate", HttpMethod.POST, request,
-////				String.class);
-////		JSONObject obj = new JSONObject(entity.getBody());
-////		System.out.println(obj.toString());
-//		
-//		
-//		ResponseEntity<String> instantiate_ns_instance_entity = null;
-//		try {
-//			instantiate_ns_instance_entity = restTemplate.exchange(
-//					this.getMANOApiEndpoint() + "/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate", HttpMethod.POST, create_ns_instance_request,
-//					String.class);
-//		} catch (RuntimeException e) {
-//			if(instantiate_ns_instance_entity!=null)
-//			{
-//				if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.SERVER_ERROR) {
-//					// handle SERVER_ERROR
-//					System.out.println("Server ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
-//				} else if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.CLIENT_ERROR) {
-//					// handle CLIENT_ERROR
-//					System.out.println("Client ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
-//					if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NOT_FOUND) {
-//						System.out.println("Unknown Response Status");
-//					}
-//				}
-//				System.out.println("Error! " + instantiate_ns_instance_entity.getBody());
-//			}
-//			else
-//			{
-//				System.out.println("Error! Null Response");
-//			}
-//			return null;
-//		}
-//
-//		if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NO_CONTENT) {
-//			System.out.println("No Content Replied!");
-//		}
-//		if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.CREATED) {
-//			System.out.println("ΝS Instanciation Succeded!");
-//		}
-//		System.out.println(instantiate_ns_instance_entity.getBody());
-//		JSONObject obj = new JSONObject(instantiate_ns_instance_entity.getBody());
-//		String nsr_id = obj.getString("id");
-//		System.out.println("The NS instantiation id is :" + ns_instance_id);
-//		return nsr_id;
-//		
-//	}	
-	
+		
 	public ResponseEntity<String> instantiateNSInstance(String ns_instance_id, String payload) 
 	{
 		RestTemplate restTemplate = new RestTemplate(requestFactory);
@@ -746,56 +626,7 @@ public class OSM5Client implements OSMClient {
 	                .body(e.getResponseBodyAsString());
 		}
 	}
-	
-//	public String getNSInstanceOperationalStatus(String ns_instance_id) {
-//		RestTemplate restTemplate = new RestTemplate(requestFactory);
-//		HttpHeaders headers = new HttpHeaders();
-//		headers.add("content-type", "application/json");
-//		headers.add("accept", "application/json");
-//		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
-//		HttpEntity<String> request = new HttpEntity<String>(headers);
-//		System.out.println("/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate");
-//
-//		ResponseEntity<String> instantiate_ns_instance_entity = null;
-//		try {
-//			instantiate_ns_instance_entity = restTemplate.exchange(
-//					this.getMANOApiEndpoint() + "/osm/nslcm/v1/ns_instances/"+ns_instance_id, HttpMethod.GET, request,
-//					String.class);
-//		} catch (RuntimeException e) {
-//			if(instantiate_ns_instance_entity!=null)
-//			{
-//				if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.SERVER_ERROR) {
-//					// handle SERVER_ERROR
-//					System.out.println("Server ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
-//				} else if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.CLIENT_ERROR) {
-//					// handle CLIENT_ERROR
-//					System.out.println("Client ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
-//					if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NOT_FOUND) {
-//						System.out.println("Unknown Response Status");
-//					}
-//				}
-//				System.out.println("Error! " + instantiate_ns_instance_entity.getBody());
-//			}
-//			else
-//			{
-//				System.out.println("Error! Null Response");
-//			}
-//			return null;
-//		}
-//
-//		if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NO_CONTENT) {
-//			System.out.println("No Content Replied!");
-//		}
-//		if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.CREATED) {
-//			System.out.println("ΝS Instanciation Succeded!");
-//		}
-//		System.out.println(instantiate_ns_instance_entity.getBody());
-//		JSONObject obj = new JSONObject(instantiate_ns_instance_entity.getBody());
-//		String operational_status = obj.getString("operational-status");
-//		System.out.println("The NS instantiation id is :" + ns_instance_id);
-//		return operational_status;		
-//	}	
-	
+		
 	public String terminateNSInstance(String ns_instance_id) {
 		RestTemplate restTemplate = new RestTemplate(requestFactory);
 		HttpHeaders headers = new HttpHeaders();
@@ -1169,5 +1000,168 @@ public class OSM5Client implements OSMClient {
 	 */
 	public static void setManoAuthorizationTokenTimeout(double manoAuthorizationTokenTimeout) {
 		OSM5Client.manoAuthorizationTokenTimeout = manoAuthorizationTokenTimeout;
-	}	
+	}
+
+	
+//	public void uploadNSDZip(String nsd_id, String zip`_path) {
+//		RestTemplate restTemplate = new RestTemplate(requestFactory);
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.add("content-type", "application/zip");
+//		headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
+//		//File file = new File(zip_path);
+//		try (InputStream inputStream = new FileInputStream(zip_path);) {
+//			long fileSize = new File(zip_path).length();
+//
+//			byte[] allBytes = new byte[(int) fileSize];
+//
+//			inputStream.read(allBytes);
+//			System.out.println("Filesize: "+fileSize +" bytes");
+//			HttpEntity<byte[]> send_zip_request = new HttpEntity<>(allBytes, headers);
+//			ResponseEntity<String> send_zip_entity = null;
+//			try {
+//				send_zip_entity = restTemplate.exchange(this.getMANOApiEndpoint()
+//						+ "/osm/nsd/v1/ns_descriptors/" + nsd_id + "/nsd_content", HttpMethod.PUT,
+//						send_zip_request, String.class);
+//			} catch (RuntimeException e) {
+//				if(send_zip_entity!=null)
+//				{
+//					if (send_zip_entity.getStatusCode().series() == HttpStatus.Series.SERVER_ERROR) {
+//						// handle SERVER_ERROR
+//						System.out.println("Server ERROR:" + send_zip_entity.getStatusCode().toString());
+//					} else if (send_zip_entity.getStatusCode().series() == HttpStatus.Series.CLIENT_ERROR) {
+//						// handle CLIENT_ERROR
+//						System.out.println("Client ERROR:" + send_zip_entity.getStatusCode().toString());
+//						if (send_zip_entity.getStatusCode() == HttpStatus.NOT_FOUND) {
+//							System.out.println("Unknown Response Status");
+//						}
+//					}
+//					System.out.println("Error! " + send_zip_entity.getBody());
+//				}
+//				else
+//				{
+//					System.out.println("Error! Null Response.");
+//				}
+//				return;
+//			}
+//
+//			if (send_zip_entity.getStatusCode() == HttpStatus.NO_CONTENT) {
+//				System.out.println("No Content Replied!");
+//			}
+//			if (send_zip_entity.getStatusCode() == HttpStatus.CREATED) {
+//				System.out.println("VFND Onboarding Succeded!");
+//			}
+//		} catch (IOException ex) {
+//			ex.printStackTrace();
+//		}
+//	}
+	
+//	public String instantiateNSInstance(String ns_instance_id, String ns_name, String vim_id, String nsd_id) {
+//	RestTemplate restTemplate = new RestTemplate(requestFactory);
+//	HttpHeaders headers = new HttpHeaders();
+//	headers.add("content-type", "application/json");
+//	headers.add("accept", "application/json");
+//	headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
+//	HttpEntity<String> request = new HttpEntity<String>(headers);
+//	System.out.println("/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate");
+//
+//	String body="{\"nsName\":\""+ns_name+"\",\"vimAccountId\":\""+vim_id+"\",\"nsdId\":\""+nsd_id+"\"}";
+//	HttpEntity<String> create_ns_instance_request = new HttpEntity<>(body, headers);
+//	System.out.println(create_ns_instance_request);
+//	
+////	ResponseEntity<String> entity = restTemplate.exchange(
+////			this.getMANOApiEndpoint() + "/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate", HttpMethod.POST, request,
+////			String.class);
+////	JSONObject obj = new JSONObject(entity.getBody());
+////	System.out.println(obj.toString());
+//	
+//	
+//	ResponseEntity<String> instantiate_ns_instance_entity = null;
+//	try {
+//		instantiate_ns_instance_entity = restTemplate.exchange(
+//				this.getMANOApiEndpoint() + "/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate", HttpMethod.POST, create_ns_instance_request,
+//				String.class);
+//	} catch (RuntimeException e) {
+//		if(instantiate_ns_instance_entity!=null)
+//		{
+//			if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.SERVER_ERROR) {
+//				// handle SERVER_ERROR
+//				System.out.println("Server ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
+//			} else if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.CLIENT_ERROR) {
+//				// handle CLIENT_ERROR
+//				System.out.println("Client ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
+//				if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NOT_FOUND) {
+//					System.out.println("Unknown Response Status");
+//				}
+//			}
+//			System.out.println("Error! " + instantiate_ns_instance_entity.getBody());
+//		}
+//		else
+//		{
+//			System.out.println("Error! Null Response");
+//		}
+//		return null;
+//	}
+//
+//	if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NO_CONTENT) {
+//		System.out.println("No Content Replied!");
+//	}
+//	if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.CREATED) {
+//		System.out.println("ΝS Instanciation Succeded!");
+//	}
+//	System.out.println(instantiate_ns_instance_entity.getBody());
+//	JSONObject obj = new JSONObject(instantiate_ns_instance_entity.getBody());
+//	String nsr_id = obj.getString("id");
+//	System.out.println("The NS instantiation id is :" + ns_instance_id);
+//	return nsr_id;
+//	
+//}	
+//	public String getNSInstanceOperationalStatus(String ns_instance_id) {
+//	RestTemplate restTemplate = new RestTemplate(requestFactory);
+//	HttpHeaders headers = new HttpHeaders();
+//	headers.add("content-type", "application/json");
+//	headers.add("accept", "application/json");
+//	headers.add("Authorization", "Bearer " + this.getMANOAuthorizationBasicHeader());
+//	HttpEntity<String> request = new HttpEntity<String>(headers);
+//	System.out.println("/osm/nslcm/v1/ns_instances/"+ns_instance_id+"/instantiate");
+//
+//	ResponseEntity<String> instantiate_ns_instance_entity = null;
+//	try {
+//		instantiate_ns_instance_entity = restTemplate.exchange(
+//				this.getMANOApiEndpoint() + "/osm/nslcm/v1/ns_instances/"+ns_instance_id, HttpMethod.GET, request,
+//				String.class);
+//	} catch (RuntimeException e) {
+//		if(instantiate_ns_instance_entity!=null)
+//		{
+//			if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.SERVER_ERROR) {
+//				// handle SERVER_ERROR
+//				System.out.println("Server ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
+//			} else if (instantiate_ns_instance_entity.getStatusCode().series() == HttpStatus.Series.CLIENT_ERROR) {
+//				// handle CLIENT_ERROR
+//				System.out.println("Client ERROR:" + instantiate_ns_instance_entity.getStatusCode().toString());
+//				if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NOT_FOUND) {
+//					System.out.println("Unknown Response Status");
+//				}
+//			}
+//			System.out.println("Error! " + instantiate_ns_instance_entity.getBody());
+//		}
+//		else
+//		{
+//			System.out.println("Error! Null Response");
+//		}
+//		return null;
+//	}
+//
+//	if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.NO_CONTENT) {
+//		System.out.println("No Content Replied!");
+//	}
+//	if (instantiate_ns_instance_entity.getStatusCode() == HttpStatus.CREATED) {
+//		System.out.println("ΝS Instanciation Succeded!");
+//	}
+//	System.out.println(instantiate_ns_instance_entity.getBody());
+//	JSONObject obj = new JSONObject(instantiate_ns_instance_entity.getBody());
+//	String operational_status = obj.getString("operational-status");
+//	System.out.println("The NS instantiation id is :" + ns_instance_id);
+//	return operational_status;		
+//}	
+	
 }
