@@ -1015,6 +1015,16 @@ public class OSM5Client implements OSMClient {
 		OSM5Client.manoAuthorizationTokenTimeout = manoAuthorizationTokenTimeout;
 	}
 
+	public ResponseEntity<String> actionNSInstance(String ns_instance_id, String payload)
+	{
+		return null;
+	}
+
+	@Override
+	public ResponseEntity<String> getNSLCMDetailsList() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 	
 //	public void uploadNSDZip(String nsd_id, String zip`_path) {
 //		RestTemplate restTemplate = new RestTemplate(requestFactory);
